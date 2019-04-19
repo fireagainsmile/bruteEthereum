@@ -89,6 +89,9 @@ func (ec *EthClient)Run() error {
 		for i := 0; i < int(diff.Uint64()); i++   {
 			ec.updateAccount(currentHeader)
 			currentHeader = ec.getHeaderByNumber(currentHeader.Number.Sub(currentHeader.Number, bigOne))
+			if currentHeader == nil{
+				return
+			}
 		}
 	}()
 	return nil

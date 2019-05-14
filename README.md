@@ -13,3 +13,6 @@ By configuring the provider in the `config.ini` and start the program, the progr
 if this program have not running for a long time, it will cost some time to update blocks to last running state or untill arise an nil block.
 
 Two hash worker running all the time using different algrithm. one generate private key randomly, one not. both of them will regenerate a new number as a new scanning point. It has the possibility that the two workers scan the same point, it also increases the possibility to find something.
+
+# Donations
+eth: `0xC7ed8A43AC291CB8353847317F7352Dc985c4C5c`

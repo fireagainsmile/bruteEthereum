@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"time"
 )
-var bigOne = big.NewInt(1)
+var BigOne = big.NewInt(1)
 
 type EthClient struct {
 	c *ethclient.Client
@@ -88,7 +88,7 @@ func (ec *EthClient)Run() error {
 	go func() {
 		for i := 0; i < int(diff.Uint64()); i++   {
 			ec.updateAccount(currentHeader)
-			currentHeader = ec.getHeaderByNumber(currentHeader.Number.Sub(currentHeader.Number, bigOne))
+			currentHeader = ec.getHeaderByNumber(currentHeader.Number.Sub(currentHeader.Number, BigOne))
 			if currentHeader == nil{
 				return
 			}
@@ -99,10 +99,13 @@ func (ec *EthClient)Run() error {
 
 func (ec *EthClient)loop() {
 	defer ec.c.Close()
+	defer ec.sub.Unsubscribe()
 	//counter := 0
 	for {
 		select {
 		case err := <-ec.sub.Err():
+			//resubscribe from provider
+			ec.SubscribTxs()
 			log.Println("[ERROR] loop received error from sub", err)
 		case <-ec.ticker.C:
 			ec.saveStatus()
@@ -136,8 +139,6 @@ func (ec *EthClient)updateAccount(head *types.Header)  {
 		if tx.To() != nil {
 			msg, _ := tx.AsMessage(types.NewEIP155Signer(ec.chainId))
 			if msg.From().Hex() != msg.To().Hex() {
-				//log.Println("saved tx:",tx.Hash().Hex())
-				//log.Println(msg.From().Hex(), msg.To().Hex())
 				ec.b.SaveAccount(redisworker.EthKey{Address:msg.From().Hex()})
 				ec.b.SaveAccount(redisworker.EthKey{Address:msg.To().Hex()})
 			}else {

@@ -5,8 +5,14 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
+	"log"
+	"math/big"
 	"math/rand"
 	"time"
+)
+
+var (
+	TotalHashed = new(big.Int)
 )
 
 type HashWorker struct {
@@ -32,8 +38,8 @@ func generatePrivKey() []byte {
 	for i := 0; i < 31; i ++ {
 		priv[i] = byte(r.Intn(256))
 	}
+	//log.Printf("%x", priv)
 	return priv
-
 }
 
 func convertToPrivateKey(privKey []byte) *ecdsa.PrivateKey {
@@ -77,29 +83,68 @@ func (hw *HashWorker)RunRand()  {
 }
 
 func (hw *HashWorker)run()  {
+	defer hw.tick.Stop()
+	counter := 0
 	for {
 		select {
 		case <-hw.tick.C:
+			TotalHashed.Add(TotalHashed, big.NewInt(int64(counter)))
 			hw.privKey = generatePrivKey()
+			log.Println("Hash Rate:",counter, "total calculated:", TotalHashed.Uint64())
+			counter = 0
 		default:
 			incrementPrivKey(hw.privKey)
 			priv := convertToPrivateKey(hw.privKey)
 			address := crypto.PubkeyToAddress(priv.PublicKey).Hex()
 			hw.redisBroker.SavePrivateKey(redisworker.EthKey{Address:address, PrivateKey:fmt.Sprintf("%x", priv.D)})
+			counter ++
 		}
 	}
 }
 
 func (hw *HashWorker)runRand()  {
+	defer hw.tick.Stop()
+	counter := 0
 	for {
 		select {
 		case <-hw.tick.C:
 			hw.privKey = generatePrivKey()
+			TotalHashed.Add(TotalHashed, big.NewInt(int64(counter)))
+			log.Println("Rand Hash Rate:",counter, " Found keys:", redisworker.Found)
+			counter = 0
 		default:
 			incrementKeyRand(hw.privKey)
 			priv := convertToPrivateKey(hw.privKey)
 			address := crypto.PubkeyToAddress(priv.PublicKey).Hex()
 			hw.redisBroker.SavePrivateKey(redisworker.EthKey{Address:address, PrivateKey:fmt.Sprintf("%x", priv.D)})
+			counter ++
+		}
+	}
+}
+
+func (hw *HashWorker)AllRand()  {
+	go hw.allRand()
+}
+
+func (hw *HashWorker)allRand()  {
+	defer hw.tick.Stop()
+	counter := 0
+	s := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(s)
+	for {
+		select {
+		case <-hw.tick.C:
+			TotalHashed.Add(TotalHashed, big.NewInt(int64(counter)))
+			log.Println("all Rand Hash Rate:",counter, " Found keys:", redisworker.Found)
+			counter = 0
+		default:
+			for i := 0; i < 31; i ++ {
+				hw.privKey[i] = byte(r.Intn(256))
+			}
+			priv := convertToPrivateKey(hw.privKey)
+			address := crypto.PubkeyToAddress(priv.PublicKey).Hex()
+			hw.redisBroker.SavePrivateKey(redisworker.EthKey{Address:address, PrivateKey:fmt.Sprintf("%x", priv.D)})
+			counter ++
 		}
 	}
 }
